@@ -386,7 +386,12 @@ class ToolAgentLoop(AgentLoopBase):
         else:
             response_ids = await self.loop.run_in_executor(
                 None,
-                lambda: self.tokenizer.apply_chat_template(add_messages, add_generation_prompt=True, tokenize=True),
+                lambda: self.tokenizer.apply_chat_template(
+                    add_messages,
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    **self.apply_chat_template_kwargs
+                ),
             )
         response_ids = response_ids[len(self.system_prompt) :]
         if len(agent_data.response_mask) + len(response_ids) >= self.response_length:
@@ -431,7 +436,12 @@ class ToolAgentLoop(AgentLoopBase):
         else:
             response_ids = await self.loop.run_in_executor(
                 None,
-                lambda: self.tokenizer.apply_chat_template(add_messages, add_generation_prompt=True, tokenize=True),
+                lambda: self.tokenizer.apply_chat_template(
+                    add_messages,
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    **self.apply_chat_template_kwargs,
+                ),
             )
         response_ids = response_ids[len(self.system_prompt) :]
 
@@ -459,7 +469,6 @@ class ToolAgentLoop(AgentLoopBase):
 
             # Load scenario
             scenario = agent_data.initial_config.get(tool_class, None)
-            scenario = {"scenario": scenario} if scenario else None
             tool_execution_response = self.client_manager.load_scenario(
                 scenario = scenario,
                 client_id = client_id

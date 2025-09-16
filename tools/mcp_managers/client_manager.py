@@ -124,25 +124,39 @@ class MCPClientManager:
             except Exception as e:
                 print(f"Error closing client: {e}")
 
-    def load_scenario(self, client_id: str, scenario: dict | str | None = None):
+    def load_scenario(self, client_id: str, scenario: dict | None = None, check: bool = False):
         """Synchronous wrapper for the async call_tool method"""
         client, status = self.get_client(client_id)
         if not status and scenario:
-            if isinstance(scenario, str):
-                scenario = json.loads(scenario)
+            tool_args = {"scenario": scenario}
             future = asyncio.run_coroutine_threadsafe(
-                self._call_tool_async("load_scenario", scenario, client),
+                self._call_tool_async("load_scenario", tool_args, client),
                 self.loop,
             )
             try:
                 result = future.result()
-                self.set_status(client_id) # TODO: call save scenario to check whether the load is successful
+                if check:
+                    saved_scenario = self.call_tool(
+                        client_id = client_id,
+                        tool_name = "save_scenario",
+                        tool_args = {},
+                    )
+                    try:
+                        if scenario == json.loads(saved_scenario):
+                            self.set_status(client_id)
+                            print(f"Load scenario succeeded with checking: {result}")
+                        else:
+                            print(f"Load scenario failed. The loaded scenario mismatch with saved scenario.")
+                    except:
+                        print(f"Load scenario failed. The loaded scenario mismatch with saved scenario.")
+                else:
+                    self.set_status(client_id)
+                    print(f"Load scenario succeeded without checking: {result}")
                 return result
             except Exception as e:
-                print(f'Failed in executing tool: {e}')
+                print(f"Load scenario failed: {e}")
                 raise e
         return "This client is already initialized. Skipping..."
-
 
     def call_tool(self, tool_name, tool_args, client_id):
         """Synchronous wrapper for the async call_tool method"""
@@ -163,7 +177,7 @@ class MCPClientManager:
             print(f"{tool_name} failed: {e}")
             raise e
 
-    async def _call_tool_async(self, tool_name: str, tool_args: dict | str, client: Client):
+    async def _call_tool_async(self, tool_name: str, tool_args: dict | str, client: Client) -> str:
         tool_name = tool_name.split("-", 1)[-1]
         async with client:
             if isinstance(tool_args, str):

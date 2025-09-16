@@ -18,7 +18,7 @@ python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=8 \
     data.max_prompt_length=8192 \
-    data.max_response_length=1024 \
+    data.max_response_length=2048 \
     data.filter_overlong_prompts=False \
     data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=Qwen/Qwen3-1.7B \
@@ -46,8 +46,8 @@ python3 -m verl.trainer.main_ppo \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger='["console","mlflow"]' \
-    trainer.project_name='gsm8k_tool-agent' \
-    trainer.experiment_name='qwen3-1.7b_function_rm-gsm8k-sgl-tool-agent-verify-n16' \
+    trainer.project_name='bfcl_tool-agent' \
+    trainer.experiment_name='qwen3-1.7b_function_rm-bfcl-sgl-tool-agent-verify-n16' \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=-1 \

@@ -475,7 +475,8 @@ class ToolAgentLoop(AgentLoopBase):
             scenario = agent_data.initial_config.get(tool_class, None)
             tool_execution_response = self.client_manager.load_scenario(
                 scenario = scenario,
-                client_id = client_id
+                client_id = client_id,
+                check = True,
             )
 
             # Call tool

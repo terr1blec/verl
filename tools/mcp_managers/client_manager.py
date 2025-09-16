@@ -73,7 +73,7 @@ class MCPClientManager:
 
                 for tool in tmp_tools:
                     tool_schema = get_tool_schema(server_name, tool)
-                    tool_name = tool.name
+                    tool_name = f"{server_name}-{tool.name}"
                     self.tool_schemas.append(tool_schema)
                     self.tools.update({tool_name: tool_schema})
 

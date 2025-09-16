@@ -17,11 +17,11 @@ python3 -m verl.trainer.main_ppo \
     --config-name="$CONFIG_NAME" \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=8 \
-    data.max_prompt_length=4096 \
+    data.max_prompt_length=8192 \
     data.max_response_length=1024 \
     data.filter_overlong_prompts=False \
     data.apply_chat_template_kwargs.enable_thinking=False \
-    actor_rollout_ref.model.path=/data/user/minruixu/share/models/Qwen3-1.7B \
+    actor_rollout_ref.model.path=Qwen/Qwen3-1.7B \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=8 \
@@ -51,7 +51,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=-1 \
-    trainer.test_freq=20 \
+    trainer.test_freq=10 \
     trainer.total_training_steps=2 \
     data.train_files=$PROJECT_DIR/data/bfcl/train.parquet \
     data.val_files=$PROJECT_DIR/data/bfcl/test.parquet \

@@ -310,7 +310,7 @@ class ToolAgentLoop(AgentLoopBase):
 
             with simple_timer("tool_calls", agent_data.metrics):
                 batch_responses = await asyncio.gather(*tasks, return_exceptions=True)
-                response.extend(batch_responses)
+                responses.extend(batch_responses)
 
         # Handle responses for interaction if needed
         if self.interaction_config_file:

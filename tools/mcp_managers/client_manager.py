@@ -160,18 +160,17 @@ class MCPClientManager:
 
     def call_tool(self, tool_name, tool_args, client_id):
         """Synchronous wrapper for the async call_tool method"""
+        # Use build-in load_scenario tool call for better error handling.
         if "load_scenario" in tool_name:
-            return self.load_scenario(
-                client_id = client_id,
-                scenario = tool_args,
-            )
+            return self.load_scenario(client_id = client_id, scenario = tool_args)
+        
         client, status = self.get_client(client_id)
         future = asyncio.run_coroutine_threadsafe(
             self._call_tool_async(tool_name, tool_args, client), self.loop
         )
         try:
             result = future.result()
-            print(f"{tool_name} succeeded: {result}")
+            print(f"{tool_name} executed: {result}")
             return result
         except Exception as e:
             print(f"{tool_name} failed: {e}")

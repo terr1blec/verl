@@ -300,12 +300,17 @@ class ToolAgentLoop(AgentLoopBase):
         add_messages: list[dict[str, Any]] = []
         new_images_this_turn: list[Any] = []  # Local variable instead of agent_data attribute
 
-        tasks = []
-        for tool_call in agent_data.tool_calls[: self.max_parallel_calls]:
-            tasks.append(self._call_tool(agent_data, tool_call))
+        # TODO: batch tool calling is not supported yet.
+        responses = []
+        for i in range(0, len(agent_data.tool_calls), self.max_parallel_calls):
+            batch_tool_calls = agent_data.tool_calls[i:i+self.max_parallel_calls]
+            tasks = []
+            for tool_call in batch_tool_calls:
+                tasks.append(self._call_tool(agent_data, tool_call))
 
-        with simple_timer("tool_calls", agent_data.metrics):
-            responses = await asyncio.gather(*tasks)
+            with simple_timer("tool_calls", agent_data.metrics):
+                batch_responses = await asyncio.gather(*tasks, return_exceptions=True)
+                response.extend(batch_responses)
 
         # Handle responses for interaction if needed
         if self.interaction_config_file:
@@ -460,7 +465,6 @@ class ToolAgentLoop(AgentLoopBase):
     async def _call_tool(self, agent_data: AgentData, tool_call: FunctionCall) -> ToolResponse:
         """Call tool and return tool response."""
         try:
-
             tool_name = tool_call.name
             tool_class = tool_name.split("-")[0]
             tool_args = json.loads(tool_call.arguments)
@@ -471,7 +475,8 @@ class ToolAgentLoop(AgentLoopBase):
             scenario = agent_data.initial_config.get(tool_class, None)
             tool_execution_response = self.client_manager.load_scenario(
                 scenario = scenario,
-                client_id = client_id
+                client_id = client_id,
+                check = True,
             )
 
             # Call tool

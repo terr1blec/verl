@@ -343,7 +343,6 @@ class ToolAgentLoop(AgentLoopBase):
                 message = {"role": "tool", "content": tool_response.text or ""}
 
             add_messages.append(message)
-            agent_data.messages.extend(add_messages)
 
             # Handle image data
             if tool_response.image:
@@ -373,6 +372,9 @@ class ToolAgentLoop(AgentLoopBase):
                     "Multimedia type 'video' is not currently supported. Only 'image' is supported."
                 )
 
+        # Update conversation messages
+        agent_data.messages.extend(add_messages)
+
         # Update prompt with tool responses
         if self.processor is not None:
             raw_tool_response = await self.loop.run_in_executor(
@@ -401,6 +403,7 @@ class ToolAgentLoop(AgentLoopBase):
         response_ids = response_ids[len(self.system_prompt) :]
         if len(agent_data.response_mask) + len(response_ids) >= self.response_length:
             return AgentState.TERMINATED
+        
         # Update prompt_ids and response_mask
         agent_data.prompt_ids += response_ids
         agent_data.response_mask += [0] * len(response_ids)

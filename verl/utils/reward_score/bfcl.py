@@ -2,16 +2,22 @@ import re
 import json
 from typing import List
 
+from mcp.server.fastmcp.tools import tool_manager
+
+TOOL_CALL_PATTERN = re.compile(r'<tool_call>\s*({.*?})\s*</tool_call>', re.DOTALL)
+
 def extract_tool_calls(text: str) -> List[str]:
     """
-    从文本中提取tool_call，只支持格式: <tool_call>{"name": "func", "arguments": {...}}</tool_call>
+    从文本中提取tool_call,只支持格式: <tool_call>{"name": "func", "arguments": {...}}</tool_call>
     """
     tool_calls = []
-    
-    # <tool_call>{"name": "func", "arguments": {...}}</tool_call>
-    pattern = r'<tool_call>\s*({.*?})\s*</tool_call>'
-    matches = re.findall(pattern, text, re.DOTALL)
-    
+
+    try:
+        matches = TOOL_CALL_PATTERN.findall(text)
+    except Exception as e:
+        print(f"Debug: regex error: {e}")
+        return tool_calls
+
     for match in matches:
         try:
             call_data = json.loads(match)
@@ -95,51 +101,8 @@ def compute_score(solution_str: str, ground_truth: str, format_score: float = 0.
         
         # 7. calculate the final content score(0-1)
         total_score = max(0.0, min(1.0, total_score - length_penalty + format_score))
-        
+
         return round(total_score, 1)
         
     except Exception:
         return 0.0
-
-# # 测试函数 @minrui 这部分你测一下可以删了
-# def test_scorer():
-#     """测试评分函数"""
-    
-#     # 测试用例1: 完全匹配
-#     solution1 = """
-#     <tool_call>{"name": "file_system-cd", "arguments": {"folder": "temp"}}</tool_call>
-#     <tool_call>{"name": "file_system-grep", "arguments": {"file_name": "final_report.pdf", "pattern": "budget analysis"}}</tool_call>
-#     """
-    
-#     ground_truth1 = '["file_system-cd(folder=\'temp\')", "file_system-grep(file_name=\'final_report.pdf\', pattern=\'budget analysis\')"]'
-    
-#     score1 = compute_score(solution1, ground_truth1, format_score=0.3)
-#     print(f"Test 1 - Perfect match: {score1}")
-    
-#     # 测试用例2: 包含额外调用
-#     solution2 = """
-#     <tool_call>{"name": "file_system-ls", "arguments": {}}</tool_call>
-#     <tool_call>{"name": "file_system-cd", "arguments": {"folder": "temp"}}</tool_call>
-#     <tool_call>{"name": "file_system-grep", "arguments": {"file_name": "final_report.pdf", "pattern": "budget analysis"}}</tool_call>
-#     <tool_call>{"name": "file_system-cat", "arguments": {"file_name": "final_report.pdf"}}</tool_call>
-#     """
-    
-#     score2 = compute_score(solution2, ground_truth1, format_score=0.3)
-#     print(f"Test 2 - With extra calls: {score2}")
-    
-#     # 测试用例3: 部分匹配
-#     solution3 = """
-#     <tool_call>{"name": "file_system-cd", "arguments": {"folder": "temp"}}</tool_call>
-#     """
-    
-#     score3 = compute_score(solution3, ground_truth1, format_score=0.3)
-#     print(f"Test 3 - Partial match: {score3}")
-    
-#     # 测试用例4: 无法解析
-#     solution4 = "Some text without tool calls"
-    
-#     score4 = compute_score(solution4, ground_truth1, format_score=0.3)
-#     print(f"Test 4 - No tool calls: {score4}")
-
-# if __name__ == "__main__":
-#     test_scorer()

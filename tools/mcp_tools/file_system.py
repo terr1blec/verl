@@ -4,9 +4,7 @@ mcp = FastMCP("FileSystem")
 
 file_system = GorillaFileSystem()
 
-@mcp.tool(
-    name="file_system-load_scenario",
-)
+@mcp.tool()
 def load_scenario(scenario: dict, long_context: bool = False):
     """
         Load a scenario into the file system.

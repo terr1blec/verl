@@ -196,6 +196,9 @@ class ToolAgentLoop(AgentLoopBase):
                 logger.error(f"Invalid state: {state}")
                 state = AgentState.TERMINATED
 
+        # Close all stateful clients
+        self.client_manager.close_all_clients(ignore_stateless_client=True)
+
         # Finalize output
         response_ids = agent_data.prompt_ids[-len(agent_data.response_mask) :]
         prompt_ids = agent_data.prompt_ids[: len(agent_data.prompt_ids) - len(agent_data.response_mask)]
@@ -297,12 +300,17 @@ class ToolAgentLoop(AgentLoopBase):
         add_messages: list[dict[str, Any]] = []
         new_images_this_turn: list[Any] = []  # Local variable instead of agent_data attribute
 
-        tasks = []
-        for tool_call in agent_data.tool_calls[: self.max_parallel_calls]:
-            tasks.append(self._call_tool(agent_data, tool_call))
+        # TODO: batch tool calling is not supported yet.
+        responses = []
+        for i in range(0, len(agent_data.tool_calls), self.max_parallel_calls):
+            batch_tool_calls = agent_data.tool_calls[i:i+self.max_parallel_calls]
+            tasks = []
+            for tool_call in batch_tool_calls:
+                tasks.append(self._call_tool(agent_data, tool_call))
 
-        with simple_timer("tool_calls", agent_data.metrics):
-            responses = await asyncio.gather(*tasks)
+            with simple_timer("tool_calls", agent_data.metrics):
+                batch_responses = await asyncio.gather(*tasks, return_exceptions=True)
+                responses.extend(batch_responses)
 
         # Handle responses for interaction if needed
         if self.interaction_config_file:
@@ -335,7 +343,6 @@ class ToolAgentLoop(AgentLoopBase):
                 message = {"role": "tool", "content": tool_response.text or ""}
 
             add_messages.append(message)
-            agent_data.messages.extend(add_messages)
 
             # Handle image data
             if tool_response.image:
@@ -365,6 +372,9 @@ class ToolAgentLoop(AgentLoopBase):
                     "Multimedia type 'video' is not currently supported. Only 'image' is supported."
                 )
 
+        # Update conversation messages
+        agent_data.messages.extend(add_messages)
+
         # Update prompt with tool responses
         if self.processor is not None:
             raw_tool_response = await self.loop.run_in_executor(
@@ -383,11 +393,17 @@ class ToolAgentLoop(AgentLoopBase):
         else:
             response_ids = await self.loop.run_in_executor(
                 None,
-                lambda: self.tokenizer.apply_chat_template(add_messages, add_generation_prompt=True, tokenize=True),
+                lambda: self.tokenizer.apply_chat_template(
+                    add_messages,
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    **self.apply_chat_template_kwargs
+                ),
             )
         response_ids = response_ids[len(self.system_prompt) :]
         if len(agent_data.response_mask) + len(response_ids) >= self.response_length:
             return AgentState.TERMINATED
+        
         # Update prompt_ids and response_mask
         agent_data.prompt_ids += response_ids
         agent_data.response_mask += [0] * len(response_ids)
@@ -428,7 +444,12 @@ class ToolAgentLoop(AgentLoopBase):
         else:
             response_ids = await self.loop.run_in_executor(
                 None,
-                lambda: self.tokenizer.apply_chat_template(add_messages, add_generation_prompt=True, tokenize=True),
+                lambda: self.tokenizer.apply_chat_template(
+                    add_messages,
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    **self.apply_chat_template_kwargs,
+                ),
             )
         response_ids = response_ids[len(self.system_prompt) :]
 
@@ -447,7 +468,6 @@ class ToolAgentLoop(AgentLoopBase):
     async def _call_tool(self, agent_data: AgentData, tool_call: FunctionCall) -> ToolResponse:
         """Call tool and return tool response."""
         try:
-
             tool_name = tool_call.name
             tool_class = tool_name.split("-")[0]
             tool_args = json.loads(tool_call.arguments)
@@ -456,10 +476,10 @@ class ToolAgentLoop(AgentLoopBase):
 
             # Load scenario
             scenario = agent_data.initial_config.get(tool_class, None)
-            scenario = {"scenario": scenario} if scenario else None
             tool_execution_response = self.client_manager.load_scenario(
                 scenario = scenario,
-                client_id = client_id
+                client_id = client_id,
+                check = True,
             )
 
             # Call tool

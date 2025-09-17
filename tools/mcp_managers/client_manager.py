@@ -5,6 +5,12 @@ import threading
 import uuid
 from fastmcp import Client
 
+# TODO: write readme.md
+# TODO: enhance logger
+# TODO: support batch tool calling
+# TODO: support loading tools from multiple class
+# TODO: freeze stateless tool class
+
 class MCPClientManager:
     _instance = None  # Private class variable to store the unique instance
 
@@ -67,7 +73,7 @@ class MCPClientManager:
 
                 for tool in tmp_tools:
                     tool_schema = get_tool_schema(server_name, tool)
-                    tool_name = tool.name
+                    tool_name = f"{server_name}-{tool.name}"
                     self.tool_schemas.append(tool_schema)
                     self.tools.update({tool_name: tool_schema})
 
@@ -105,45 +111,72 @@ class MCPClientManager:
                 del self.clients[client_id]
                 print(f"Client {client_id} closed and removed")
 
-    def load_scenario(self, client_id: str, scenario: dict | str | None = None):
+    def close_all_clients(self, ignore_stateless_client: bool = False):
+        """Close all clients"""
+        futures = []
+        for client_id in list(self.clients.keys()):
+            future = asyncio.run_coroutine_threadsafe(self.close_client(client_id), self.loop)
+            futures.append(future)
+        
+        for future in futures:
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Error closing client: {e}")
+
+    def load_scenario(self, client_id: str, scenario: dict | None = None, check: bool = False):
         """Synchronous wrapper for the async call_tool method"""
         client, status = self.get_client(client_id)
         if not status and scenario:
-            if isinstance(scenario, str):
-                scenario = json.loads(scenario)
+            tool_args = {"scenario": scenario}
             future = asyncio.run_coroutine_threadsafe(
-                self._call_tool_async("load_scenario", scenario, client),
+                self._call_tool_async("load_scenario", tool_args, client),
                 self.loop,
             )
             try:
-                self.set_status(client_id) # TODO: call save scenario to check whether the load is successful
                 result = future.result()
+                if check:
+                    saved_scenario = self.call_tool(
+                        client_id = client_id,
+                        tool_name = "save_scenario",
+                        tool_args = {},
+                    )
+                    try:
+                        if scenario == json.loads(saved_scenario):
+                            self.set_status(client_id)
+                            print(f"Load scenario succeeded with checking: {result}")
+                        else:
+                            print(f"Load scenario failed. The loaded scenario mismatch with saved scenario.")
+                    except:
+                        print(f"Load scenario failed. The loaded scenario mismatch with saved scenario.")
+                else:
+                    self.set_status(client_id)
+                    print(f"Load scenario succeeded without checking: {result}")
                 return result
             except Exception as e:
-                print(f'Failed in executing tool: {e}')
+                print(f"Load scenario failed: {e}")
                 raise e
         return "This client is already initialized. Skipping..."
 
-
     def call_tool(self, tool_name, tool_args, client_id):
         """Synchronous wrapper for the async call_tool method"""
+        # Use build-in load_scenario tool call for better error handling.
         if "load_scenario" in tool_name:
-            return self.load_scenario(
-                client_id = client_id,
-                scenario = tool_args,
-            )
+            return self.load_scenario(client_id = client_id, scenario = tool_args)
+        
         client, status = self.get_client(client_id)
         future = asyncio.run_coroutine_threadsafe(
             self._call_tool_async(tool_name, tool_args, client), self.loop
         )
         try:
             result = future.result()
+            print(f"{tool_name} executed: {result}")
             return result
         except Exception as e:
-            print(f'Failed in executing tool: {e}')
+            print(f"{tool_name} failed: {e}")
             raise e
 
-    async def _call_tool_async(self, tool_name: str, tool_args: dict | str, client: Client):
+    async def _call_tool_async(self, tool_name: str, tool_args: dict | str, client: Client) -> str:
         tool_name = tool_name.split("-", 1)[-1]
         async with client:
             if isinstance(tool_args, str):
@@ -154,18 +187,12 @@ class MCPClientManager:
     def shutdown(self, timeout=5):
         """Cleanup and shutdown the manager"""
         # Close all clients
-        futures = []
-        for client_id in list(self.clients.keys()):
-            future = asyncio.run_coroutine_threadsafe(self.close_client(client_id), self.loop)
-            futures.append(future)
-        
-        # Wait for clients to close
-        for future in futures:
-            try:
-                future.result(timeout = timeout)
-            except Exception as e:
-                print(f"Error during client shutdown: {e}")
+        self.close_all_clients()
         
         # Stop the event loop
         self.loop.call_soon_threadsafe(self.loop.stop)
-        self.loop_thread.join()
+        self.loop_thread.join(timeout=timeout)
+        
+        # Handle case where thread doesn't join within timeout
+        if self.loop_thread.is_alive():
+            print(f"Warning: Event loop thread did not terminate within {timeout} seconds")

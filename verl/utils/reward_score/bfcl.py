@@ -1,14 +1,30 @@
 import re
 import json
 from typing import List
+import logging
+import os
 
-from mcp.server.fastmcp.tools import tool_manager
+logger = logging.getLogger()
+logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 TOOL_CALL_PATTERN = re.compile(r'<tool_call>\s*({.*?})\s*</tool_call>', re.DOTALL)
 
+def normalize_function_call(name: str, args: dict) -> str:
+    """
+    Normalize function call format to ensure consistent parameter ordering
+    """
+    # Method 1: Sort parameters alphabetically (recommended)
+    sorted_args = []
+    for key in sorted(args.keys()):
+        value = args[key]
+        sorted_args.append(f"{key}='{value}'")
+    
+    args_str = ', '.join(sorted_args)
+    return f"{name}({args_str})"
+
 def extract_tool_calls(text: str) -> List[str]:
     """
-    从文本中提取tool_call,只支持格式: <tool_call>{"name": "func", "arguments": {...}}</tool_call>
+    Extract tool_call from text, only supports format: <tool_call>{"name": "func", "arguments": {...}}</tool_call>
     """
     tool_calls = []
 
@@ -25,19 +41,45 @@ def extract_tool_calls(text: str) -> List[str]:
                 name = call_data['name']
                 args = call_data.get('arguments', {})
                 
-                # 标准化为 function(arg1='value1', arg2='value2') 格式
-                sorted_args = []
-                for key in sorted(args.keys()):
-                    value = args[key]
-                    sorted_args.append(f"{key}='{value}'")
-                
-                args_str = ', '.join(sorted_args)
-                normalized_call = f"{name}({args_str})"
+                # Use unified normalization function
+                normalized_call = normalize_function_call(name, args)
                 tool_calls.append(normalized_call)
         except json.JSONDecodeError:
             continue
     
     return tool_calls
+
+def normalize_ground_truth_calls(ground_truth_calls: List[str]) -> List[str]:
+    """
+    Normalize function calls in ground truth
+    """
+    normalized_calls = []
+    
+    for call in ground_truth_calls:
+        # Parse function call format: func_name(arg1='val1', arg2='val2')
+        match = re.match(r'([^(]+)\((.*)\)', call.strip())
+        if match:
+            func_name = match.group(1)
+            args_str = match.group(2)
+            
+            # Parse parameters
+            args = {}
+            if args_str.strip():
+                # Simple parameter parsing (assuming parameter format is key='value')
+                arg_pattern = re.compile(r"(\w+)='([^']*)'")
+                for arg_match in arg_pattern.finditer(args_str):
+                    key = arg_match.group(1)
+                    value = arg_match.group(2)
+                    args[key] = value
+            
+            # Use the same normalization function
+            normalized_call = normalize_function_call(func_name, args)
+            normalized_calls.append(normalized_call)
+        else:
+            # If unable to parse, keep as is
+            normalized_calls.append(call)
+    
+    return normalized_calls
 
 def parse_ground_truth(ground_truth: str) -> List[str]:
     """
@@ -45,11 +87,15 @@ def parse_ground_truth(ground_truth: str) -> List[str]:
     """
     try:
         if ground_truth.strip().startswith('['):
-            return json.loads(ground_truth)
+            calls = json.loads(ground_truth)
         else:
-            return [line.strip() for line in ground_truth.strip().split('\n') if line.strip()]
+            calls = [line.strip() for line in ground_truth.strip().split('\n') if line.strip()]
+        
+        # Normalize ground truth calls
+        return normalize_ground_truth_calls(calls)
     except json.JSONDecodeError:
-        return [line.strip() for line in ground_truth.strip().split('\n') if line.strip()]
+        calls = [line.strip() for line in ground_truth.strip().split('\n') if line.strip()]
+        return normalize_ground_truth_calls(calls)
 
 def compute_score(solution_str: str, ground_truth: str, format_score: float = 0.1, extra_info=None) -> float:
     """
@@ -68,9 +114,9 @@ def compute_score(solution_str: str, ground_truth: str, format_score: float = 0.
         # 1. extract the tool_calls from solution
         solution_calls = extract_tool_calls(solution_str)
         
-        # 2. parse the ground_truth
+        # 2. parse the ground_truth (already normalized)
         ground_truth_calls = parse_ground_truth(ground_truth)
-        
+
         # 3. if no tool_calls are extracted, return 0
         if not solution_calls:
             return 0.0
@@ -91,7 +137,7 @@ def compute_score(solution_str: str, ground_truth: str, format_score: float = 0.
             total_score = 0.0
         
         # 6. calculate the length penalty
-        length_ratio = len(solution_calls) / len(ground_truth_calls)
+        length_ratio = len(solution_calls) / len(ground_truth_calls) if len(ground_truth_calls) > 0 else 1.0
         length_penalty = 0.0
         
         if length_ratio > 2.0:
@@ -104,5 +150,6 @@ def compute_score(solution_str: str, ground_truth: str, format_score: float = 0.
 
         return round(total_score, 1)
         
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Debug: Error in compute_score: {e}")
         return 0.0

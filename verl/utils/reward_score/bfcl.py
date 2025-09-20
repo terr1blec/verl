@@ -182,7 +182,11 @@ def compute_score(solution_str: str, ground_truth: str, extra_info=None) -> floa
             solution=extra_info['sol_final_config'],
             ground_truth=extra_info['gts_final_config'],
         )
-        return 0.5 * trace_score + 0.5 * answer_score
+        return {
+            "score": 0.5 * trace_score + 0.5 * answer_score,
+            "trace_score": trace_score,
+            "answer_score": answer_score,
+        }
         
     except Exception as e:
         logger.warning(f"Debug: Error in compute_score: {e}")

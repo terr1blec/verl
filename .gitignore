@@ -11,6 +11,8 @@
 **/mlruns
 **/tensorboard_log
 **/rollout_data_dir
+**/rollout_trace
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

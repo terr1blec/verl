@@ -4,12 +4,8 @@ import json
 import threading
 import uuid
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
-# TODO: write readme.md
-# TODO: enhance logger
-# TODO: support batch tool calling
-# TODO: support loading tools from multiple class
-# TODO: freeze stateless tool class
 
 class MCPClientManager:
     _instance = None  # Private class variable to store the unique instance
@@ -124,6 +120,22 @@ class MCPClientManager:
             except Exception as e:
                 print(f"Error closing client: {e}")
 
+    def save_all_scenario(self) -> dict:
+        saved_all_scenario = {}
+        for client_id, client_info in self.clients.items():
+            tool_class = client_id.split("-")[0]
+            saved_scenario = self.call_tool(
+                client_id = client_id,
+                tool_name = "save_scenario",
+                tool_args = {},
+            )
+            try:
+                saved_scenario = json.loads(saved_scenario)
+            except:
+                saved_scenario = None
+            saved_all_scenario.update({tool_class: saved_scenario})
+        return saved_all_scenario
+
     def load_scenario(self, client_id: str, scenario: dict | None = None, check: bool = False):
         """Synchronous wrapper for the async call_tool method"""
         client, status = self.get_client(client_id)
@@ -135,7 +147,7 @@ class MCPClientManager:
             )
             try:
                 result = future.result()
-                if check:
+                if check: # TODO: we need to handle the case where the scenario fails to load 
                     saved_scenario = self.call_tool(
                         client_id = client_id,
                         tool_name = "save_scenario",
@@ -170,11 +182,13 @@ class MCPClientManager:
         )
         try:
             result = future.result()
-            print(f"{tool_name} executed: {result}")
+            print(f"{tool_name} execute: {result}")
             return result
-        except Exception as e:
-            print(f"{tool_name} failed: {e}")
+        except ToolError as e:
+            print(f"{tool_name} fail before execution: {e}")
             raise e
+        except Exception as e:
+            print(f"{tool_name} raise an unexpected error: {e}")
 
     async def _call_tool_async(self, tool_name: str, tool_args: dict | str, client: Client) -> str:
         tool_name = tool_name.split("-", 1)[-1]

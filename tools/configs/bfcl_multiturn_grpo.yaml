@@ -16,6 +16,7 @@ data:
     enable_thinking: True
   truncation_side: left
   truncation: left
+  dump_folder: rollout_trace/
 
 actor_rollout_ref:
   hybrid_engine: True

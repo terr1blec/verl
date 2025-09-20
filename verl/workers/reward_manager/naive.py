@@ -16,6 +16,7 @@ from collections import defaultdict
 from typing import Any
 
 import torch
+import json
 
 from verl import DataProto
 from verl.utils.reward_score import default_compute_score
@@ -83,6 +84,15 @@ class NaiveRewardManager(AbstractRewardManager):
             extra_info = data_item.non_tensor_batch.get("extra_info", {})
             num_turns = data_item.non_tensor_batch.get("__num_turns__", None)
             extra_info["num_turns"] = num_turns
+
+            # final config
+            gts_final_config = extra_info.get("final_config", None)
+            if isinstance(gts_final_config, str):
+                gts_final_config = json.loads(gts_final_config)
+            
+            sol_final_config = data_item.non_tensor_batch.get("final_config", None)
+            extra_info['gts_final_config'] = gts_final_config
+            extra_info['sol_final_config'] = sol_final_config
 
             score = self.compute_score(
                 data_source=data_source,

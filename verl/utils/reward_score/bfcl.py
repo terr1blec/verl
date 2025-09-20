@@ -97,7 +97,69 @@ def parse_ground_truth(ground_truth: str) -> List[str]:
         calls = [line.strip() for line in ground_truth.strip().split('\n') if line.strip()]
         return normalize_ground_truth_calls(calls)
 
-def compute_score(solution_str: str, ground_truth: str, format_score: float = 0.1, extra_info=None) -> float:
+def _compute_trace_score(solution: str, ground_truth: str) -> float:
+    # 1. extract the tool_calls from solution
+    solution_calls = extract_tool_calls(solution)
+    
+    # 2. parse the ground_truth (already normalized)
+    ground_truth_calls = parse_ground_truth(ground_truth)
+
+    # 3. if no tool_calls are extracted, return 0
+    if not solution_calls:
+        return 0.0
+    
+    # 4. if the ground_truth is empty, return 1
+    if not ground_truth_calls:
+        return 1.0
+    
+    # 5. check if the ground_truth is a subsequence of solution
+    gt_idx = 0
+    for sol_call in solution_calls:
+        if gt_idx < len(ground_truth_calls) and sol_call == ground_truth_calls[gt_idx]:
+            gt_idx += 1
+    
+    if gt_idx == len(ground_truth_calls):
+        total_score = 1.0
+    else:
+        total_score = 0.0
+
+    return total_score
+
+def _compute_length_penalty(solution, ground_truth) -> float:
+    length_ratio = len(solution) / len(ground_truth) if len(ground_truth) > 0 else 1.0
+    length_penalty = 0.0
+    
+    if length_ratio > 2.0:
+        length_penalty = min(0.3, (length_ratio - 2.0) * 0.1)
+    elif length_ratio > 1.5:
+        length_penalty = min(0.1, (length_ratio - 1.5) * 0.2)
+    return length_penalty
+
+def _compute_answer_score(solution: str | dict, ground_truth: str | dict) -> float:
+    """
+    Calculate the answer score based on exact match.
+    
+    Args:
+        solution: The solution answer (string or dict)
+        ground_truth: The ground truth answer (string or dict)
+    
+    Returns:
+        float: 1.0 if exact match, 0.0 otherwise
+    """
+    if isinstance(ground_truth, dict):
+        if isinstance(solution, str):
+            try:
+                import json
+                solution = json.loads(solution)
+            except Exception:
+                return 0.0
+        
+        if solution == ground_truth:
+            return 1.0
+        else:
+            return 0.0
+
+def compute_score(solution_str: str, ground_truth: str, extra_info=None) -> float:
     """
     calculate the score of solution relative to ground_truth, only return the numerical value
     
@@ -111,44 +173,18 @@ def compute_score(solution_str: str, ground_truth: str, format_score: float = 0.
         float: solution==grouth_truch - length_penalty + format_score
     """
     try:
-        # 1. extract the tool_calls from solution
-        solution_calls = extract_tool_calls(solution_str)
-        
-        # 2. parse the ground_truth (already normalized)
-        ground_truth_calls = parse_ground_truth(ground_truth)
+        trace_score = _compute_trace_score(
+            solution=solution_str,
+            ground_truth=ground_truth,
+        )
 
-        # 3. if no tool_calls are extracted, return 0
-        if not solution_calls:
-            return 0.0
-        
-        # 4. if the ground_truth is empty, return 1
-        if not ground_truth_calls:
-            return 1.0
-        
-        # 5. check if the ground_truth is a subsequence of solution
-        gt_idx = 0
-        for sol_call in solution_calls:
-            if gt_idx < len(ground_truth_calls) and sol_call == ground_truth_calls[gt_idx]:
-                gt_idx += 1
-        
-        if gt_idx == len(ground_truth_calls):
-            total_score = 1.0
-        else:
-            total_score = 0.0
-        
-        # 6. calculate the length penalty
-        length_ratio = len(solution_calls) / len(ground_truth_calls) if len(ground_truth_calls) > 0 else 1.0
-        length_penalty = 0.0
-        
-        if length_ratio > 2.0:
-            length_penalty = min(0.3, (length_ratio - 2.0) * 0.1)
-        elif length_ratio > 1.5:
-            length_penalty = min(0.1, (length_ratio - 1.5) * 0.2)
-        
-        # 7. calculate the final content score(0-1)
-        total_score = max(0.0, min(1.0, total_score - length_penalty + format_score))
-
-        return round(total_score, 1)
+        answer_score = _compute_answer_score(
+            solution=extra_info['sol_final_config'],
+            ground_truth=extra_info['gts_final_config'],
+        )
+        if 0.5 * trace_score + 0.5 * answer_score > 0:
+            breakpoint()
+        return 0.5 * trace_score + 0.5 * answer_score
         
     except Exception as e:
         logger.warning(f"Debug: Error in compute_score: {e}")

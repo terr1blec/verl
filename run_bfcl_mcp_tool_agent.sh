@@ -16,7 +16,7 @@ python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=1 \
     data.max_prompt_length=2048 \
-    data.max_response_length=512 \
+    data.max_response_length=1024 \
     data.filter_overlong_prompts=False \
     data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=Qwen/Qwen3-0.6B \
@@ -52,7 +52,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.test_freq=1 \
     trainer.rollout_data_dir=$PROJECT_DIR/rollout_data_dir/rollout_train_data_dir \
     trainer.validation_data_dir=$PROJECT_DIR/rollout_data_dir/rollout_val_data_dir \
+    data.dump_folder=$PROJECT_DIR/rollout_trace \
     data.train_files=$PROJECT_DIR/data/bfcl/train.parquet \
     data.val_files=$PROJECT_DIR/data/bfcl/test.parquet \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="$PROJECT_DIR/tools/mcp_configs/bfcl_mcp_server.json" \
-    trainer.total_epochs=5 $@
+    trainer.total_epochs=1 $@

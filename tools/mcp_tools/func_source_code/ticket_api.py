@@ -50,7 +50,12 @@ class TicketAPI:
         """
         Save current scenario from the ticket queue.
         """
-        return {"scenario": {"ticket_queue": self.ticket_queue, "ticket_counter": self.ticket_counter, "current_user": self.current_user}}
+        scenario = {
+            "ticket_queue": self.ticket_queue,
+            "ticket_counter": self.ticket_counter,
+            "current_user": self.current_user
+        }
+        return scenario
 
     def create_ticket(
         self, title: str, description: str = "", priority: int = 1

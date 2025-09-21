@@ -77,6 +77,7 @@ class VehicleControlAPI:
         self.rearLeftTirePressure: float
         self.rearRightTirePressure: float
         self._api_description = "This tool belongs to the vehicle control system, which allows users to control various aspects of the car such as engine, doors, climate control, lights, and more."
+        self.random_seed: int
 
     def _load_scenario(self, scenario: dict, long_context=False) -> None:
         """
@@ -167,7 +168,7 @@ class VehicleControlAPI:
             "random_seed": self._random.getstate()[1][0] if hasattr(self, '_random') else 141053,
             "fuelLevel": self.fuelLevel,
             "batteryVoltage": self.batteryVoltage,
-            "engine_state": self.engine_state,
+            "engineState": self.engine_state,
             "remainingUnlockedDoors": self.remainingUnlockedDoors,
             "doorStatus": self.doorStatus,
             "acTemperature": self.acTemperature,
@@ -176,8 +177,8 @@ class VehicleControlAPI:
             "humidityLevel": self.humidityLevel,
             "headLightStatus": self.headLightStatus,
             "parkingBrakeStatus": self.parkingBrakeStatus,
-            "_parkingBrakeForce": self._parkingBrakeForce,
-            "_slopeAngle": self._slopeAngle,
+            "parkingBrakeForce": self._parkingBrakeForce,
+            "slopeAngle": self._slopeAngle,
             "brakePedalStatus": self.brakePedalStatus,
             "brakePedalForce": self._brakePedalForce,
             "distanceToNextVehicle": self.distanceToNextVehicle,

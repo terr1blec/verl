@@ -153,7 +153,7 @@ def _compute_answer_score(solution: str | dict, ground_truth: str | dict) -> flo
                 solution = json.loads(solution)
             except Exception:
                 return 0.0
-    breakpoint()
+
     if solution == ground_truth:
         return 1.0
     else:

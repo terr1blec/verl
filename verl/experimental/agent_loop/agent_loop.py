@@ -596,6 +596,7 @@ class AgentLoopWorker:
                 non_tensor_batch = {
                     **{k: np.array([v]) for k, v in kwargs.items()},
                     "__num_turns__": np.array([output.num_turns]),
+                    "final_config": np.array([output.extra_fields['final_config']])
                 }
                 data = DataProto(
                     batch=batch,

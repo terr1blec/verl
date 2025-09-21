@@ -281,7 +281,7 @@ class ToolAgentLoop(AgentLoopBase):
                 None,
                 lambda: self.tokenizer.apply_chat_template(
                     agent_data.messages,
-                    tools=self.filter_tools(agent_data.involved_class)[:6],
+                    tools=self.filter_tools(agent_data.involved_class),
                     add_generation_prompt=True,
                     tokenize=True,
                     truncation=True,

@@ -123,13 +123,13 @@ class MCPClientManager:
     def save_all_scenario(self) -> dict:
         saved_all_scenario = {}
         for client_id, client_info in self.clients.items():
-            tool_class = client_id.split("-")[0]
-            saved_scenario = self.call_tool(
-                client_id = client_id,
-                tool_name = "save_scenario",
-                tool_args = {},
-            )
             try:
+                tool_class = client_id.split("-")[0]
+                saved_scenario = self.call_tool(
+                    client_id = client_id,
+                    tool_name = "save_scenario",
+                    tool_args = {},
+                )
                 saved_scenario = json.loads(saved_scenario)
             except:
                 saved_scenario = None

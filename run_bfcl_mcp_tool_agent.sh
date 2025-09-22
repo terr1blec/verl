@@ -52,7 +52,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.test_freq=1 \
     trainer.rollout_data_dir=$PROJECT_DIR/rollout_data_dir/rollout_train_data_dir \
     trainer.validation_data_dir=$PROJECT_DIR/rollout_data_dir/rollout_val_data_dir \
-    data.dump_folder=$PROJECT_DIR/rollout_trace \
+    data.log_dump_path=$PROJECT_DIR/log \
     data.train_files=$PROJECT_DIR/data/bfcl/train.parquet \
     data.val_files=$PROJECT_DIR/data/bfcl/test.parquet \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="$PROJECT_DIR/tools/mcp_configs/bfcl_mcp_server.json" \

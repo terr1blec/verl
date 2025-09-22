@@ -154,6 +154,7 @@ class TradingBot:
         self.stocks: Dict[str, Dict[str, Union[float, int]]]
         self.watch_list: List[str]
         self.transaction_history: List[Dict[str, Union[str, float, int]]]
+        self.random_seed: int
         self._api_description = "This tool belongs to the trading system, which allows users to trade stocks, manage their account, and view stock information."
 
     def _load_scenario(self, scenario: dict, long_context=False) -> None:
@@ -186,9 +187,8 @@ class TradingBot:
             "transaction_history", DEFAULT_STATE_COPY["transaction_history"]
         )
         self.long_context = long_context
-        self._random = random.Random(
-            (scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"]))
-        )
+        self.random_seed = scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
+        self._random = random.Random(self.random_seed)
 
     def save_scenario(self) -> Dict[str, Union[Dict, str]]:
         """
@@ -207,7 +207,7 @@ class TradingBot:
                 "stocks": self.stocks,
                 "watch_list": self.watch_list,
                 "transaction_history": self.transaction_history,
-                "random_seed": self.random_seed if hasattr(self, 'random_seed') else 1053520
+                "random_seed": self.random_seed 
             }
             return {"scenario": scenario, "message": "Scenario saved successfully."}
         except Exception as e:

@@ -86,9 +86,8 @@ class VehicleControlAPI:
             scenario (Dict): The scenario to load.
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
-        self._random = random.Random(
-            (scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"]))
-        )
+        self.random_seed = scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
+        self._random = random.Random(self.random_seed)
         self.fuelLevel = scenario.get(
             "fuelLevel", DEFAULT_STATE_COPY["fuelLevel"]
         )  # in gallons
@@ -165,7 +164,7 @@ class VehicleControlAPI:
             scenario (Dict): The current scenario state of the vehicle.
         """
         scenario = {
-            "random_seed": self._random.getstate()[1][0] if hasattr(self, '_random') else 141053,
+            "random_seed": self.random_seed,
             "fuelLevel": self.fuelLevel,
             "batteryVoltage": self.batteryVoltage,
             "engineState": self.engine_state,

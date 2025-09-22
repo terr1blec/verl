@@ -64,7 +64,10 @@ class MessageAPI:
         self.inbox: List[Dict[str, str]]
         self.message_count: int
         self.current_user: Optional[str]
+        self.random_seed: int
         self._api_description = "This tool belongs to the Message API, which is used to manage user interactions in a workspace."
+
+
 
     def _load_scenario(self, scenario: dict, long_context=False) -> None:
         """
@@ -74,7 +77,8 @@ class MessageAPI:
             scenario (Dict): A dictionary containing message data.
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
-        self._random = random.Random((scenario.get("random_seed", 200191)))
+        self.random_seed = scenario.get("random_seed", 200191)
+        self._random = random.Random((self.random_seed))
         self.generated_ids = scenario.get(
             "generated_ids", DEFAULT_STATE_COPY["generated_ids"]
         )
@@ -85,6 +89,18 @@ class MessageAPI:
             "message_count", DEFAULT_STATE_COPY["message_count"]
         )
         self.current_user = scenario.get("current_user", DEFAULT_STATE_COPY["current_user"])
+
+    def save_scenario(self) -> dict:
+        scenario = {
+            "generated_ids": list(self.generated_ids),  # Convert set to list for JSON serialization
+            "user_count": self.user_count,
+            "user_map": self.user_map,
+            "inbox": self.inbox,
+            "message_count": self.message_count,
+            "current_user": self.current_user,
+            "random_seed": self.random_seed,
+        }
+        return scenario
 
 
     def __eq__(self, value: object) -> bool:

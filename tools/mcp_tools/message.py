@@ -30,15 +30,8 @@ def save_scenario():
         message (str): A message describing the result of the save operation.
     """
     try:
-        scenario = {
-            "generated_ids": list(message_api.generated_ids),  # Convert set to list for JSON serialization
-            "user_count": message_api.user_count,
-            "user_map": message_api.user_map,
-            "inbox": message_api.inbox,
-            "message_count": message_api.message_count,
-            "current_user": message_api.current_user,
-        }
-        return scenario
+        result = message_api.save_scenario()
+        return result
     except Exception as e:
         return f"Error: {str(e)}"
 

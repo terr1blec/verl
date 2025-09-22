@@ -35,6 +35,7 @@ class TravelAPI:
         self.budget_limit: Optional[float]
         self._api_description = "This tool belongs to the travel system, which allows users to book flights, manage credit cards, and view budget information."
         self._flight_cost_lookup: Dict[str, Dict[str, float]] = {}
+        self.random_seed: int
 
     def _load_scenario(
         self,
@@ -47,9 +48,8 @@ class TravelAPI:
             scenario (Dict[str, str]): The scenario to load
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
-        self._random = random.Random(
-            (scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"]))
-        )
+        self.random_seed = scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
+        self._random = random.Random(self.random_seed)
         self.credit_card_list = scenario.get(
             "credit_card_list", DEFAULT_STATE_COPY["credit_card_list"]
         )
@@ -93,7 +93,7 @@ class TravelAPI:
                 "user_first_name": self.user_first_name,
                 "user_last_name": self.user_last_name,
                 "budget_limit": self.budget_limit,
-                "random_seed": self._random.getstate()[1][0] if hasattr(self, '_random') else 141053
+                "random_seed": self.random_seed
             }
             return {"scenario": scenario, "message": "Scenario saved successfully."}
         except Exception as e:

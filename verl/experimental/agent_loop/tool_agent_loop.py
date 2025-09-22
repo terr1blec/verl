@@ -16,6 +16,7 @@ import copy
 import json
 import logging
 import os
+from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 from uuid import uuid4
@@ -101,7 +102,14 @@ class ToolAgentLoop(AgentLoopBase):
         cls.max_parallel_calls = config.actor_rollout_ref.rollout.multi_turn.max_parallel_calls # FIXME: Current design only consider max_parallel_calls=1.
         cls.max_tool_response_length = config.actor_rollout_ref.rollout.multi_turn.max_tool_response_length
         cls.tool_response_truncate_side = config.actor_rollout_ref.rollout.multi_turn.tool_response_truncate_side
-        cls.dump_folder = config.data.dump_folder
+
+        log_dump_path = config.data.log_dump_path
+        os.makedirs(log_dump_path, exist_ok=True)
+        if os.path.isdir(config.data.log_dump_path):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            cls.log_dump_path = f"{config.data.log_dump_path}/{timestamp}.jsonl"
+        else:
+            cls.log_dump_path = config.data.log_dump_path
         tool_config_path = config.actor_rollout_ref.rollout.multi_turn.tool_config_path
 
         cls.client_manager = MCPClientManager()
@@ -142,36 +150,6 @@ class ToolAgentLoop(AgentLoopBase):
         
         return filtered_tool_schemas
 
-    def update_tool_calls_trace(self, agent_data: AgentData, tool_call: dict):
-        agent_data.tool_calls_trace.extend([
-            {
-                "role": "assistant",
-                "content": {"tool_name": tool_call['tool_name'], "tool_args": tool_call['tool_args']},
-            },
-            {
-                "role": "tool",
-                "content": tool_call['tool_execution_response'],
-            }
-        ])
-
-    def _dump_loop(self, agent_data: AgentData) -> None:
-        if len(agent_data.tool_calls_trace) == 0:
-            return
-
-        os.makedirs(self.dump_folder, exist_ok=True)
-
-        timestamp = int(asyncio.get_event_loop().time() * 1000)
-        dump_path = os.path.join(self.dump_folder, f"{timestamp}.json")
-        dump_data = {
-            "tool_calls_trace": agent_data.tool_calls_trace
-        }
-
-        try:
-            with open(dump_path, 'w') as f:
-                json.dump(dump_data, f, indent=2, default=str)
-            logger.info(f"Dumped loop trace to {dump_path}")
-        except Exception as e:
-            logger.error(f"Failed to dump loop trace: {e}")
 
     @rollout_trace_op
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> AgentLoopOutput:
@@ -232,6 +210,9 @@ class ToolAgentLoop(AgentLoopBase):
         # Save all scenarios
         saved_all_scenario = self.client_manager.save_all_scenario()
 
+        # Dump log
+        self.client_manager.dump_log(self.log_dump_path)
+
         # Close all stateful clients
         self.client_manager.close_all_clients(ignore_stateless_client=True)
 
@@ -253,9 +234,6 @@ class ToolAgentLoop(AgentLoopBase):
         )
         output.extra_fields.update({"turn_scores": agent_data.turn_scores})
         output.extra_fields.update({"final_config": saved_all_scenario})
-
-        if self.dump_folder:
-            self._dump_loop(agent_data)
 
         return output
 
@@ -302,6 +280,17 @@ class ToolAgentLoop(AgentLoopBase):
                 sampling_params=sampling_params,
                 image_data=agent_data.image_data,
             )
+
+        self.client_manager.add_log(
+            client_id = agent_data.request_id,
+            info = {
+                "chat": {
+                    "system": self.system_prompt,
+                    "user": self.tokenizer.decode(agent_data.prompt_ids),
+                    "assistant": self.tokenizer.decode(output.token_ids),
+                }
+            }
+        )
 
         agent_data.response_ids = output.token_ids
         agent_data.prompt_ids += agent_data.response_ids
@@ -519,14 +508,6 @@ class ToolAgentLoop(AgentLoopBase):
                 client_id = client_id,
                 check = False,
             )
-            self.update_tool_calls_trace(
-                agent_data = agent_data,
-                tool_call = {
-                    "tool_name": f"{tool_class}-load_scenario",
-                    "tool_args": {"scenario": scenario},
-                    "tool_execution_response": tool_execution_response,
-                }
-            )
 
             # Call tool
             tool_execution_response = self.client_manager.call_tool(
@@ -534,14 +515,7 @@ class ToolAgentLoop(AgentLoopBase):
                 tool_args = tool_args,
                 client_id = client_id,
             )
-            self.update_tool_calls_trace(
-                agent_data = agent_data,
-                tool_call = {
-                    "tool_name": tool_name,
-                    "tool_args": tool_args,
-                    "tool_execution_response": tool_execution_response,
-                }
-            )
+
         except Exception as e:
             logger.warning(f"Error when executing tool: {e}")
             return ToolResponse(

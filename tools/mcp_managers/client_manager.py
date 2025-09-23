@@ -78,15 +78,13 @@ class MCPClientManager:
 
             await tmp_client.close() # close temporary client
 
-    def dump_log(self, log_dump_path="log/") -> None:
+    def dump_log(self, log_dump_path="log/log.jsonl") -> None:
         try:
             os.makedirs(os.path.dirname(log_dump_path), exist_ok=True)
             
             with jsonlines.open(log_dump_path, mode='a') as writer:
                 for client_id, logs in self.log_info.items():
-                    for log_entry in logs:
-                        log_entry_with_id = {"client_id": client_id, **log_entry}
-                        writer.write(log_entry_with_id)
+                    writer.write({client_id: logs})
             
         except Exception as e:
             print(f"Error dumping logs: {e}")
@@ -103,24 +101,27 @@ class MCPClientManager:
                 - tool_args
                 - tool_result
         """
-        if client_id not in self.log_info:
-            self.log_info[client_id] = []
+        no_class_client_id = client_id.split("-")[-1] # remove tool class from client id
+        if no_class_client_id not in self.log_info:
+            self.log_info[no_class_client_id] = []
         
+        log = {}
         if "chat" in info:
-            chat = info["chat"]
-            if "system" in chat:
-                self.log_info[client_id].append({"role": "system", "content": chat["system"]})
-            if "user" in chat:
-                self.log_info[client_id].append({"role": "user", "content": chat["user"]})
-            if "assistant" in chat:
-                self.log_info[client_id].append({"role": "assistant", "content": chat["assistant"]})
-
+            log["chat"] = {
+                "system": info['chat'].get("system", ""),
+                "user": info['chat'].get("user", ""),
+                "assistant": info['chat'].get("assistant", "")
+            }
+        
         if "tool" in info:
-            tool = info["tool"]
-            self.log_info[client_id].extend([
-                {"role": "assistant", "content": {"tool_name": tool["tool_name"], "tool_args": tool["tool_args"]}},
-                {"role": "tool", "content": tool["tool_result"]}
-            ])
+            log["tool"] = {
+                "tool_name": info["tool"].get("tool_name", ""),
+                "tool_args": info["tool"].get("tool_args", ""),
+                "tool_result": info["tool"].get("tool_result", "")
+            }
+        
+        if log:
+            self.log_info[no_class_client_id].append(log)
             
     def set_status(self, client_id):
         client_info = self.clients.get(client_id)
@@ -152,7 +153,6 @@ class MCPClientManager:
                 print(f"Error closing client {client_id}: {e}")
             finally:
                 del self.clients[client_id]
-                del self.log_info[client_id]
                 print(f"Client {client_id} closed and removed")
 
     def close_all_clients(self, ignore_stateless_client: bool = False):
@@ -167,6 +167,9 @@ class MCPClientManager:
                 future.result()
             except Exception as e:
                 print(f"Error closing client: {e}")
+                
+        self.log_info = {}
+
 
     def save_all_scenario(self) -> dict:
         saved_all_scenario = {}

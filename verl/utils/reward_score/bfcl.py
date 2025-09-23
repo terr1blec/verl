@@ -135,6 +135,34 @@ def _compute_length_penalty(solution, ground_truth) -> float:
         length_penalty = min(0.1, (length_ratio - 1.5) * 0.2)
     return length_penalty
 
+def _compute_state_score(solution: str | dict, ground_truth: str | dict) -> float:
+    """
+    Calculate the accuracy score by comparing states after tool callings.
+    
+    Args:
+        solution: The solution state containing tool configurations with tool classes as keys and final config as values.
+        ground_truth: The ground truth state containing the expected tool configurations with tool classes as keys and final config as values.
+
+    Returns:
+        float: A score between 0.0 and 1.0 representing the accuracy.
+    """
+    def _ensure_dict(obj: str | dict) -> dict | None:
+        if isinstance(obj, dict):
+            return obj
+        if isinstance(obj, str):
+            try:
+                return json.loads(obj)
+            except Exception:
+                return {}
+
+    ground_truth = _ensure_dict(ground_truth)
+    solution = _ensure_dict(solution)
+    
+    matches = sum(1 for tool_class, final_config in ground_truth.items() 
+                 if solution.get(tool_class) == final_config)
+    
+    return matches / len(ground_truth) if ground_truth else 0.0
+
 def _compute_answer_score(solution: str | dict, ground_truth: str | dict) -> float:
     """
     Calculate the answer score based on exact match.
@@ -178,16 +206,20 @@ def compute_score(solution_str: str, ground_truth: str, extra_info=None) -> floa
             ground_truth=ground_truth,
         )
 
-        answer_score = _compute_answer_score(
+        state_score = _compute_state_score(
             solution=extra_info['sol_final_config'],
             ground_truth=extra_info['gts_final_config'],
         )
         return {
-            "score": 0.5 * trace_score + 0.5 * answer_score,
+            "score": 0.5 * trace_score + 0.5 * state_score,
             "trace_score": trace_score,
-            "answer_score": answer_score,
+            "state_score": state_score,
         }
         
     except Exception as e:
         logger.warning(f"Debug: Error in compute_score: {e}")
-        return 0.0
+        return {
+            "score": 0.0,
+            "trace_score": 0.0,
+            "state_score": 0.0,
+        }

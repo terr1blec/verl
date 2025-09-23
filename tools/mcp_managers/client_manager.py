@@ -108,7 +108,7 @@ class MCPClientManager:
         log = {}
         if "chat" in info:
             log["chat"] = {
-                "system": info['chat'].get("system", ""),
+                # "system": info['chat'].get("system", ""),
                 "user": info['chat'].get("user", ""),
                 "assistant": info['chat'].get("assistant", "")
             }

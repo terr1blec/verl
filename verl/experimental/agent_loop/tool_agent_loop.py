@@ -28,7 +28,7 @@ from verl.interactions.utils.interaction_registry import initialize_interactions
 from verl.tools.schemas import ToolResponse
 from verl.utils.profiler import simple_timer
 from verl.utils.rollout_trace import rollout_trace_op
-from tools.mcp_configs.bfcl_mcp_tools_to_ignore import TOOLS_TO_IGNORE
+from tools.mcp_configs.bfcl_mcp_tools import TOOL_SYSTEM_PROMPT, TOOLS_TO_IGNORE
 from tools.mcp_managers.client_manager import MCPClientManager
 
 logger = logging.getLogger(__file__)
@@ -58,7 +58,8 @@ class AgentData:
         involved_class: Optional[str] = None,
         initial_config: Optional[dict[str, Any]] = None,
     ):
-        self.messages = messages
+        self.messages = [{"content": TOOL_SYSTEM_PROMPT, "role": "system"}]
+        self.messages.extend(messages)
         self.image_data = image_data
         self.metrics = metrics
         self.request_id = request_id
@@ -285,7 +286,6 @@ class ToolAgentLoop(AgentLoopBase):
             client_id = agent_data.request_id,
             info = {
                 "chat": {
-                    "system": self.system_prompt,
                     "user": self.tokenizer.decode(agent_data.prompt_ids),
                     "assistant": self.tokenizer.decode(output.token_ids),
                 }

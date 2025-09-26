@@ -1,28 +1,36 @@
 {
     "mcpServers": {
         "file_system": {
-            "local_path": "tools/mcp_tools/file_system.py"
+            "local_path": "tools/mcp_tools/file_system.py",
+            "stateless": false
         },
         "math": {
-            "local_path": "tools/mcp_tools/math_api.py"
+            "local_path": "tools/mcp_tools/math_api.py",
+            "stateless": true
         },
         "posting": {
-            "local_path": "tools/mcp_tools/posting.py"
+            "local_path": "tools/mcp_tools/posting.py",
+            "stateless": false
         },
         "ticket": {
-            "local_path": "tools/mcp_tools/ticket.py"
+            "local_path": "tools/mcp_tools/ticket.py",
+            "stateless": false
         },
         "trading": {
-            "local_path": "tools/mcp_tools/trading.py"
+            "local_path": "tools/mcp_tools/trading.py",
+            "stateless": false
         },
         "travel": {
-            "local_path": "tools/mcp_tools/travel.py"
+            "local_path": "tools/mcp_tools/travel.py",
+            "stateless": false
         },
         "vehicle": {
-            "local_path": "tools/mcp_tools/vehicle.py"
+            "local_path": "tools/mcp_tools/vehicle.py",
+            "stateless": false
         },
         "message": {
-            "local_path": "tools/mcp_tools/message.py"
+            "local_path": "tools/mcp_tools/message.py",
+            "stateless": false
         }
     }
 }

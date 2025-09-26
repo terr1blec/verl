@@ -82,7 +82,6 @@ class AgentData:
         # Extra information such as involved_class, initial_config, etc.
         self.involved_class = involved_class
         self.initial_config = initial_config
-        self.tool_calls_trace = []
 
 
 @register("tool_agent")
@@ -103,18 +102,11 @@ class ToolAgentLoop(AgentLoopBase):
         cls.max_parallel_calls = config.actor_rollout_ref.rollout.multi_turn.max_parallel_calls # FIXME: Current design only consider max_parallel_calls=1.
         cls.max_tool_response_length = config.actor_rollout_ref.rollout.multi_turn.max_tool_response_length
         cls.tool_response_truncate_side = config.actor_rollout_ref.rollout.multi_turn.tool_response_truncate_side
-
-        log_dump_path = config.data.log_dump_path
-        os.makedirs(log_dump_path, exist_ok=True)
-        if os.path.isdir(config.data.log_dump_path):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            cls.log_dump_path = f"{config.data.log_dump_path}/{timestamp}.jsonl"
-        else:
-            cls.log_dump_path = config.data.log_dump_path
+        cls.log_dump_path = config.data.log_dump_path
         tool_config_path = config.actor_rollout_ref.rollout.multi_turn.tool_config_path
 
         cls.client_manager = MCPClientManager()
-        cls.client_manager.initConfig(tool_config_path)
+        cls.client_manager.init_config(tool_config_path)
         cls.tools = cls.client_manager.tools
         cls.tool_schemas = cls.client_manager.tool_schemas
 

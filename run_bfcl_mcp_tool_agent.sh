@@ -6,9 +6,11 @@ export VLLM_USE_V1=1
 export HF_HUB_OFFLINE=1 # disable hf when offline
 
 PROJECT_DIR="$(pwd)"
+OUTPUT_DIR="/data/user/minruixu/outputs"
 CONFIG_PATH="$PROJECT_DIR/tools/configs"
 CONFIG_NAME="bfcl_multiturn_grpo"
 TIMESTAMP="$(date +"%Y%m%d-%H%M")"
+EXP_NAME="qwen3-1.7b-bfcl-n16-vllm-think"
 
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
@@ -45,15 +47,15 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger='["console","tensorboard"]' \
     trainer.project_name='bfcl_tool-agent' \
-    trainer.experiment_name="qwen3-0.6b_function_rm-bfcl-vllm-tool-agent-n8-${TIMESTAMP}" \
+    trainer.experiment_name="${EXP_NAME}-${TIMESTAMP}" \
     trainer.n_gpus_per_node=1 \
     trainer.nnodes=1 \
     trainer.save_freq=-1 \
     trainer.test_freq=1 \
-    trainer.rollout_data_dir=$PROJECT_DIR/rollout_data_dir/rollout_train_data_dir \
-    trainer.validation_data_dir=$PROJECT_DIR/rollout_data_dir/rollout_val_data_dir \
-    data.log_dump_path=$PROJECT_DIR/log \
-    data.train_files=$PROJECT_DIR/data/bfcl/train.parquet \
-    data.val_files=$PROJECT_DIR/data/bfcl/test.parquet \
+    trainer.rollout_data_dir=$OUTPUT_DIR/rollout_data_dir/$EXP_NAME/$TIMESTAMP/rollout_train_data_dir \
+    trainer.validation_data_dir=$OUTPUT_DIR/rollout_data_dir/$EXP_NAME/$TIMESTAMP/rollout_val_data_dir \
+    data.log_dump_path=$OUTPUT_DIR/log/$EXP_NAME/$TIMESTAMP.jsonl \
+    data.train_files=$PROJECT_DIR/data/BFCL/multi-turn/train_1st_turn.parquet \
+    data.val_files=$PROJECT_DIR/data/BFCL/multi-turn/test_1st_turn.parquet \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="$PROJECT_DIR/tools/mcp_configs/bfcl_mcp_server.json" \
     trainer.total_epochs=1 $@

@@ -18,7 +18,8 @@ class MCPClientManager:
 
     def __init__(self):
         if not hasattr(self, 'clients'):  # The singleton should only be inited once
-            self.clients = {}
+            self.clients = {} # client_id to stateful clients
+            self.stateless_clients = {} # tool class to stateless clients
             self.class_to_path_mapping = {}
             self.log_info = {}
             
@@ -32,10 +33,18 @@ class MCPClientManager:
         self.loop.run_forever()
 
     # TODO
-    def is_valid_mcp_servers(self, config: dict): 
+    def is_valid_mcp_servers(self, config: dict) -> bool:
         return True
 
-    def initConfig(self, config_path: str):
+    def is_valid_client_id(self, client_id: str) -> bool:
+        '''A valid client_id must follow "str-str" where substring str contains hyphens.'''
+        if not isinstance(client_id, str):
+            return False
+
+        parts = client_id.split("-")
+        return len(parts) == 2 and all(parts) and client_id.count('-') == 1
+
+    def init_config(self, config_path: str):
         with open(config_path) as f:
             config = json.load(f)
         
@@ -64,19 +73,27 @@ class MCPClientManager:
             }
 
         mcp_servers = config['mcpServers']
-        for server_name, server in mcp_servers.items(): # server name is class name
+        for server_name, server in mcp_servers.items():
+            is_stateless = server['stateless']
             self.class_to_path_mapping[server_name] = server['local_path']
-            tmp_client = Client(server['local_path'])
-            async with tmp_client:
-                tmp_tools = await tmp_client.list_tools()
+            client = Client(server['local_path'])
+            async with client:
+                tools = await client.list_tools()
 
-                for tool in tmp_tools:
+                for tool in tools:
                     tool_schema = get_tool_schema(server_name, tool)
                     tool_name = f"{server_name}-{tool.name}"
                     self.tool_schemas.append(tool_schema)
                     self.tools.update({tool_name: tool_schema})
 
-            await tmp_client.close() # close temporary client
+            if is_stateless:
+                # save stateless class
+                # a stateless client do not have load_scenario and save_scenario function
+                # a stateless client will never create new instance
+                self.stateless_clients[server_name] = client
+            else:
+                # close stateful class
+                await client.close()
 
     def dump_log(self, log_dump_path="log/log.jsonl") -> None:
         try:
@@ -90,38 +107,12 @@ class MCPClientManager:
             print(f"Error dumping logs: {e}")
 
     def add_log(self, client_id, info: dict) -> None:
-        """
-        info
-            - chat
-                - system
-                - user
-                - assistant
-            - tool
-                - tool_name
-                - tool_args
-                - tool_result
-        """
         no_class_client_id = client_id.split("-")[-1] # remove tool class from client id
         if no_class_client_id not in self.log_info:
             self.log_info[no_class_client_id] = []
         
-        log = {}
-        if "chat" in info:
-            log["chat"] = {
-                # "system": info['chat'].get("system", ""),
-                "user": info['chat'].get("user", ""),
-                "assistant": info['chat'].get("assistant", "")
-            }
-        
-        if "tool" in info:
-            log["tool"] = {
-                "tool_name": info["tool"].get("tool_name", ""),
-                "tool_args": info["tool"].get("tool_args", ""),
-                "tool_result": info["tool"].get("tool_result", "")
-            }
-        
-        if log:
-            self.log_info[no_class_client_id].append(log)
+        if info:
+            self.log_info[no_class_client_id].append(info)
             
     def set_status(self, client_id):
         client_info = self.clients.get(client_id)
@@ -132,10 +123,13 @@ class MCPClientManager:
         """
         Get a client from a given client id or create a new client if not exist.
         """
-        if self.clients.get(client_id, None):
+        if client_id in self.clients:
             return self.clients[client_id]['client'], self.clients[client_id]['status']
 
         tool_class = client_id.split("-")[0]
+        if tool_class in self.stateless_clients:
+            return self.stateless_clients[tool_class], True
+
         new_client = Client(self.class_to_path_mapping[tool_class])
         self.clients[client_id] = {
             "client": new_client,
@@ -155,8 +149,8 @@ class MCPClientManager:
                 del self.clients[client_id]
                 print(f"Client {client_id} closed and removed")
 
-    def close_all_clients(self, ignore_stateless_client: bool = False):
-        """Close all clients"""
+    def close_all_clients(self):
+        """Close all stateful clients."""
         futures = []
         for client_id in list(self.clients.keys()):
             future = asyncio.run_coroutine_threadsafe(self.close_client(client_id), self.loop)
@@ -167,34 +161,11 @@ class MCPClientManager:
                 future.result()
             except Exception as e:
                 print(f"Error closing client: {e}")
-                
+           
         self.log_info = {}
 
-
-    def save_all_scenario(self) -> dict:
-        saved_all_scenario = {}
-        for client_id, client_info in self.clients.items():
-            try:
-                tool_class = client_id.split("-")[0]
-                saved_scenario = self.call_tool(
-                    client_id = client_id,
-                    tool_name = "save_scenario",
-                    tool_args = {},
-                )
-                saved_scenario = json.loads(saved_scenario)
-            except:
-                saved_scenario = None
-            saved_all_scenario.update({tool_class: saved_scenario})
-        return saved_all_scenario
-
     def load_scenario(self, client_id: str, scenario: dict | None = None, check: bool = False):
-        """
-        Synchronous wrapper for the async call_tool method
-        Args:
-            client_id:
-            scenario:
-            check:
-        """
+        """Synchronous wrapper for the async call_tool method"""
         client, status = self.get_client(client_id)
         if not status and scenario:
             tool_args = {"scenario": scenario}
@@ -265,6 +236,22 @@ class MCPClientManager:
         )
 
         return result.content[0].text
+
+    def save_all_scenario(self) -> dict:
+        saved_all_scenario = {}
+        for client_id, client_info in self.clients.items():
+            try:
+                tool_class = client_id.split("-")[0]
+                saved_scenario = self.call_tool(
+                    client_id = client_id,
+                    tool_name = "save_scenario",
+                    tool_args = {},
+                )
+                saved_scenario = json.loads(saved_scenario)
+            except:
+                saved_scenario = None
+            saved_all_scenario.update({tool_class: saved_scenario})
+        return saved_all_scenario
 
     def shutdown(self, timeout=5):
         """Cleanup and shutdown the manager"""
